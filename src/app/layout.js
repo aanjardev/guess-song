@@ -22,7 +22,16 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col relative">
+        {children}
+
+        {/* Watermark */}
+        <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
+          <div className="text-gray-600 text-lg font-light select-none">
+            Made by aanjar.
+          </div>
+        </div>
+      </body>
     </html>
   );
 }

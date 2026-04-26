@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🎵 Guess the Song
 
-## Getting Started
+A dark-themed, vibrant music guessing game based on artists! Test your knowledge of your favorite artists' songs.
 
-First, run the development server:
+## 🎮 How to Play
+
+1. **Choose an Artist**: Search and select your favorite artist
+2. **Listen to Preview**: Play a 7-second song preview
+3. **Guess the Title**: Choose from 3 song options
+4. **Score Points**: Correct answers = +1 point
+5. **Complete 10 Rounds**: Finish all rounds to see your final result!
+
+## ✨ Features
+
+- 🎨 **Dark & Vibrant Theme**: Dark background with blue and purple accents
+- 🎵 **Song Previews**: Listen to 7-second previews from iTunes
+- 📊 **Scoring System**: Track points and rounds in real-time
+- 🎯 **Multiple Choice**: 3 answer options per question
+- ⏱️ **Timer**: Track how long you take to complete the game
+- 📈 **Progress Bar**: Visual progress indicator for rounds
+- 🏆 **Result Screen**: Get personalized feedback based on your score
+- 🎭 **Dynamic Feedback**: Animated responses for correct/incorrect answers
+- 📱 **Responsive**: Works on all devices
+- 🔄 **Replay Options**: Play again or try different artists
+- 🏷️ **Watermark**: Subtle "aanjar" watermark in bottom-right corner
+
+## 🎯 Scoring System
+
+- **True Fan** (7-10/10): Amazing! You're a real fan!
+- **Good Job** (5-6/10): Not bad! You know your songs well!
+- **Keep Learning** (0-4/10): Time to listen to more music!
+
+## 📊 Game Statistics
+
+After completing 10 rounds, you'll see:
+
+- Final score and accuracy percentage
+- Time taken to complete the game
+- Personalized feedback based on performance
+- Options to replay or try different artists
+
+## 🚀 Running the Project
+
+### Requirements
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+1. Clone this repository
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Build for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## 🛠️ Technologies
 
-To learn more about Next.js, take a look at the following resources:
+- **Next.js 16** - React framework
+- **Tailwind CSS 4** - Utility-first CSS framework
+- **iTunes API** - Music data source
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/
+│   ├── globals.css          # Global styling and components
+│   ├── layout.js            # App layout
+│   ├── page.js              # Home page (artist search)
+│   ├── game/
+│   │   └── page.js          # Game page (10 rounds with timer)
+│   ├── result/
+│   │   └── page.js          # Results page with statistics
+│   └── api/itunes/search/
+│       └── route.js         # iTunes API endpoint
+└── lib/
+    └── itunes.js            # iTunes API helper (placeholder)
+```
 
-## Deploy on Vercel
+## 🎨 Design Theme
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Background**: Dark gradient from gray to blue-black
+- **Primary Colors**: Blue and black as base colors
+- **Accents**: Purple and green for interactive elements
+- **Effects**: Blur, gradients, and smooth animations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 License
+
+This project is created for educational and entertainment purposes.
