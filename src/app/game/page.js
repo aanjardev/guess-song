@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Headphones,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 export default function GamePage() {
+  // ========== 1. STATE DECLARATIONS ==========
   const [artist, setArtist] = useState(null);
   const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
@@ -32,88 +33,138 @@ export default function GamePage() {
   const [audioProgress, setAudioProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [usedSongIds, setUsedSongIds] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
   const audioRef = useRef(null);
   const progressIntervalRef = useRef(null);
   const router = useRouter();
 
-  // Clean up interval on unmount
-  useEffect(() => {
-    return () => {
+  // ========== 2. FUNGSI PEMBANTU ==========
+  const formatTime = (seconds) => {
+    const secs = Math.floor(seconds);
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+
+    if (mins > 0) {
+      return `${mins}:${remainingSecs < 10 ? "0" + remainingSecs : remainingSecs}`;
+    }
+    return `0:${remainingSecs < 10 ? "0" + remainingSecs : remainingSecs}`;
+  };
+
+  // ========== 3. FUNGSI LOAD NEW QUESTION ==========
+  const loadNewQuestion = useCallback(
+    (songList) => {
+      // Pastikan songList ada dan tidak kosong
+      if (!songList || songList.length === 0) {
+        console.log("No songs available to load question");
+        return false;
+      }
+
+      // Stop any playing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-      if (audioRef.current) {
-        audioRef.current.pause();
+      setAudioProgress(0);
+      setCurrentTime(0);
+
+      // Filter lagu yang BELUM pernah dipakai di sesi ini
+      let availableSongs = songList.filter(
+        (song) => !usedSongIds.includes(song.trackId),
+      );
+
+      // Jika semua lagu sudah dipakai, reset history
+      if (availableSongs.length === 0) {
+        console.log("All songs used, resetting history");
+        setUsedSongIds([]);
+        availableSongs = [...songList];
       }
-    };
-  }, []);
 
-  // Update audio progress
-  const startProgressTracking = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
+      // Pastikan availableSongs tidak kosong
+      if (availableSongs.length === 0) {
+        console.error("No available songs to choose from");
+        return false;
+      }
 
-    progressIntervalRef.current = setInterval(() => {
-      if (audioRef.current && !audioRef.current.paused) {
-        const current = audioRef.current.currentTime;
-        const dur = audioRef.current.duration || 30;
-        setCurrentTime(current);
-        setAudioProgress((current / dur) * 100);
+      // Pilih lagu random dari lagu yang tersedia
+      const randomIndex = Math.floor(Math.random() * availableSongs.length);
+      const correctSong = availableSongs[randomIndex];
 
-        // Stop at 7 seconds
-        if (current >= 7) {
-          audioRef.current.pause();
-          setIsPlaying(false);
-          setAudioProgress(0);
-          setCurrentTime(0);
-          if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-          }
+      // Tandai lagu ini sudah dipakai
+      setUsedSongIds((prev) => [...prev, correctSong.trackId]);
+
+      // Ambil lagu lain untuk pilihan salah
+      const otherSongs = songList.filter(
+        (s) => s.trackId !== correctSong.trackId,
+      );
+
+      // Acak dan filter pilihan salah
+      const getRandomUniqueWrongChoices = () => {
+        const shuffledOthers = [...otherSongs];
+        for (let i = shuffledOthers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledOthers[i], shuffledOthers[j]] = [
+            shuffledOthers[j],
+            shuffledOthers[i],
+          ];
         }
-      }
-    }, 100);
-  };
 
-  // Ambil data artis dari localStorage
-  useEffect(() => {
-    const savedArtist = localStorage.getItem("selectedArtist");
-    if (!savedArtist) {
-      router.push("/");
+        const uniqueSongs = [];
+        const seenTitles = new Set();
+        seenTitles.add(correctSong.trackName.toLowerCase());
+
+        for (const song of shuffledOthers) {
+          const titleLower = song.trackName.toLowerCase();
+          if (!seenTitles.has(titleLower)) {
+            uniqueSongs.push(song);
+            seenTitles.add(titleLower);
+          }
+          if (uniqueSongs.length >= 2) break;
+        }
+
+        return uniqueSongs;
+      };
+
+      const uniqueWrongSongs = getRandomUniqueWrongChoices();
+      let wrongChoices = uniqueWrongSongs.map((s) => s.trackName);
+
+      if (wrongChoices.length < 2) {
+        const fallbackSongs = otherSongs
+          .filter(
+            (s) =>
+              s.trackName.toLowerCase() !== correctSong.trackName.toLowerCase(),
+          )
+          .slice(0, 2);
+        wrongChoices = fallbackSongs.map((s) => s.trackName);
+      }
+
+      // Gabungkan dan acak pilihan
+      let allChoices = [correctSong.trackName, ...wrongChoices];
+      for (let i = allChoices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allChoices[i], allChoices[j]] = [allChoices[j], allChoices[i]];
+      }
+
+      setCurrentSong(correctSong);
+      setChoices(allChoices);
+      setFeedback(null);
+      setSelectedChoice(null);
+
+      return true;
+    },
+    [usedSongIds],
+  );
+
+  // Tambahkan fungsi ini setelah loadNewQuestion
+  const loadFirstQuestion = (songList) => {
+    if (!songList || songList.length === 0) {
+      console.log("No songs available to load question");
+      setLoading(false);
       return;
     }
-    setArtist(JSON.parse(savedArtist));
-    setGameStartTime(Date.now());
-  }, [router]);
-
-  // Ambil daftar lagu dari artis
-  useEffect(() => {
-    if (!artist) return;
-
-    const fetchSongs = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/itunes/search?term=${encodeURIComponent(artist.artistName)}&entity=song&limit=50`,
-        );
-        const data = await res.json();
-        const songsWithPreview = (data.results || []).filter(
-          (song) => song.previewUrl,
-        );
-        setSongs(songsWithPreview);
-        loadNewQuestion(songsWithPreview);
-      } catch (error) {
-        console.error("Failed to fetch songs:", error);
-      }
-      setLoading(false);
-    };
-
-    fetchSongs();
-  }, [artist]);
-
-  // Muat pertanyaan baru
-  const loadNewQuestion = (songList = songs) => {
-    if (!songList.length) return;
 
     // Stop any playing audio
     if (audioRef.current) {
@@ -126,25 +177,120 @@ export default function GamePage() {
     setAudioProgress(0);
     setCurrentTime(0);
 
-    const randomIndex = Math.floor(Math.random() * songList.length);
-    const correctSong = songList[randomIndex];
+    // Filter lagu yang BELUM pernah dipakai di sesi ini
+    let availableSongs = songList.filter(
+      (song) => !usedSongIds.includes(song.trackId),
+    );
 
+    // Jika semua lagu sudah dipakai, reset history
+    if (availableSongs.length === 0) {
+      console.log("All songs used, resetting history");
+      setUsedSongIds([]);
+      availableSongs = [...songList];
+    }
+
+    // Pastikan availableSongs tidak kosong
+    if (availableSongs.length === 0) {
+      console.error("No available songs to choose from");
+      setLoading(false);
+      return;
+    }
+
+    // Pilih lagu random
+    const randomIndex = Math.floor(Math.random() * availableSongs.length);
+    const correctSong = availableSongs[randomIndex];
+
+    // Tandai lagu ini sudah dipakai
+    setUsedSongIds((prev) => [...prev, correctSong.trackId]);
+
+    // Ambil lagu lain untuk pilihan salah
     const otherSongs = songList.filter(
       (s) => s.trackId !== correctSong.trackId,
     );
-    const shuffledOthers = [...otherSongs].sort(() => 0.5 - Math.random());
-    const wrongChoices = shuffledOthers.slice(0, 2).map((s) => s.trackName);
 
-    const allChoices = [correctSong.trackName, ...wrongChoices];
-    allChoices.sort(() => 0.5 - Math.random());
+    // Acak dan filter pilihan salah
+    const getRandomUniqueWrongChoices = () => {
+      const shuffledOthers = [...otherSongs];
+      for (let i = shuffledOthers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledOthers[i], shuffledOthers[j]] = [
+          shuffledOthers[j],
+          shuffledOthers[i],
+        ];
+      }
+
+      const uniqueSongs = [];
+      const seenTitles = new Set();
+      seenTitles.add(correctSong.trackName.toLowerCase());
+
+      for (const song of shuffledOthers) {
+        const titleLower = song.trackName.toLowerCase();
+        if (!seenTitles.has(titleLower)) {
+          uniqueSongs.push(song);
+          seenTitles.add(titleLower);
+        }
+        if (uniqueSongs.length >= 2) break;
+      }
+
+      return uniqueSongs;
+    };
+
+    const uniqueWrongSongs = getRandomUniqueWrongChoices();
+    let wrongChoices = uniqueWrongSongs.map((s) => s.trackName);
+
+    if (wrongChoices.length < 2) {
+      const fallbackSongs = otherSongs
+        .filter(
+          (s) =>
+            s.trackName.toLowerCase() !== correctSong.trackName.toLowerCase(),
+        )
+        .slice(0, 2);
+      wrongChoices = fallbackSongs.map((s) => s.trackName);
+    }
+
+    // Gabungkan dan acak pilihan
+    let allChoices = [correctSong.trackName, ...wrongChoices];
+    for (let i = allChoices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allChoices[i], allChoices[j]] = [allChoices[j], allChoices[i]];
+    }
 
     setCurrentSong(correctSong);
     setChoices(allChoices);
     setFeedback(null);
     setSelectedChoice(null);
+    setLoading(false); // Pastikan loading selesai
   };
 
-  // Putar preview lagu
+  // ========== 4. FUNGSI AUDIO ==========
+  const startProgressTracking = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+
+    progressIntervalRef.current = setInterval(() => {
+      if (audioRef.current && !audioRef.current.paused) {
+        const current = audioRef.current.currentTime;
+        setCurrentTime(current);
+
+        const maxDuration = 7;
+        let progress = (current / maxDuration) * 100;
+        if (progress > 100) progress = 100;
+        setAudioProgress(progress);
+
+        if (current >= maxDuration) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+          setAudioProgress(100);
+          setCurrentTime(maxDuration);
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+          }
+        }
+      }
+    }, 100);
+  };
+
   const playPreview = () => {
     if (!currentSong?.previewUrl || feedback) return;
 
@@ -157,11 +303,7 @@ export default function GamePage() {
 
     const audio = new Audio(currentSong.previewUrl);
     audioRef.current = audio;
-
-    // Set volume
     audio.volume = isMuted ? 0 : 1;
-
-    // Start from second 0
     audio.currentTime = 0;
 
     audio.play().catch((err) => {
@@ -172,7 +314,6 @@ export default function GamePage() {
     startProgressTracking();
   };
 
-  // Pause preview
   const pausePreview = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -183,7 +324,6 @@ export default function GamePage() {
     }
   };
 
-  // Toggle mute
   const toggleMute = () => {
     if (audioRef.current) {
       audioRef.current.muted = !isMuted;
@@ -191,7 +331,7 @@ export default function GamePage() {
     setIsMuted(!isMuted);
   };
 
-  // Handle user answer
+  // ========== 5. FUNGSI HANDLER LAINNYA ==========
   const handleAnswer = (selectedAnswer) => {
     if (feedback) return;
 
@@ -205,7 +345,6 @@ export default function GamePage() {
       setFeedback("wrong");
     }
 
-    // Stop audio and clean up
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -217,7 +356,6 @@ export default function GamePage() {
     setCurrentTime(0);
   };
 
-  // Next question
   const nextQuestion = () => {
     if (round >= maxRounds) {
       const endTime = Date.now();
@@ -234,10 +372,12 @@ export default function GamePage() {
       return;
     }
     setRound(round + 1);
-    loadNewQuestion();
+    // Gunakan songs state yang sudah ada
+    if (songs.length > 0) {
+      loadNewQuestion(songs);
+    }
   };
 
-  // Get button style based on state
   const getButtonStyle = (choice) => {
     let baseStyle =
       "w-full text-left p-4 rounded-xl transition-all duration-300 border ";
@@ -266,12 +406,68 @@ export default function GamePage() {
     return baseStyle + "bg-slate-800/30 border-slate-700/50 text-slate-500";
   };
 
-  // Format time (seconds to MM:SS)
-  const formatTime = (seconds) => {
-    const secs = Math.floor(seconds);
-    return `0:${secs < 10 ? "0" + secs : secs}`;
-  };
+  // ========== 6. useEffect HOOKS ==========
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
 
+  // Ambil artist dari localStorage
+  useEffect(() => {
+    const savedArtist = localStorage.getItem("selectedArtist");
+    if (!savedArtist) {
+      router.push("/");
+      return;
+    }
+    setArtist(JSON.parse(savedArtist));
+    setGameStartTime(Date.now());
+  }, [router]);
+
+  // Ambil daftar lagu dari artis
+  // Ambil daftar lagu dari artis
+  useEffect(() => {
+    if (!artist) return;
+
+    const fetchSongs = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/itunes/search?term=${encodeURIComponent(artist.artistName)}&entity=song&limit=50`,
+        );
+        const data = await res.json();
+        const songsWithPreview = (data.results || []).filter(
+          (song) => song.previewUrl,
+        );
+
+        console.log(`Found ${songsWithPreview.length} songs with preview`);
+
+        if (songsWithPreview.length === 0) {
+          console.error("No songs with preview found for this artist");
+          setLoading(false);
+          return;
+        }
+
+        setSongs(songsWithPreview);
+        setUsedSongIds([]);
+
+        loadFirstQuestion(songsWithPreview);
+      } catch (error) {
+        console.error("Failed to fetch songs:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchSongs();
+  }, [artist]);
+
+  // ========== 7. RENDER CONDITIONAL ==========
   if (loading || !currentSong) {
     return (
       <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -290,6 +486,7 @@ export default function GamePage() {
     );
   }
 
+  // ========== 8. MAIN RENDER ==========
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Animated Background */}
